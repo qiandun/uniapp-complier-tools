@@ -1,0 +1,79 @@
+{
+  "name": "uniapp-complier-tools",
+  "displayName": "uniapp条件编译小工具",
+  "description": "条件编译是用特殊的注释作为标记，在编译时根据这些特殊的注释，将注释里面的代码编译到不同平台",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "^1.88.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/qiandun/uniapp-complier-tools.git"
+  },
+  "capabilities": {
+    "workspace": {
+      "readonly": true
+    }
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:vue",
+    "onLanguage:typescript",
+    "onLanguage:javascript",
+    "onLanguage:html",
+    "onLanguage:css",
+    "onLanguage:scss",
+    "onLanguage:less",
+    "onLanguage:stylus",
+    "onLanguage:pug",
+    "onLanguage:json",
+    "onFileSystem:file"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [],
+    "configuration": {
+      "type": "object",
+      "title": "UniApp 条件编译",
+      "properties": {
+        "uniapp-complier-tools.highlightColorDo": {
+          "type": "string",
+          "default": "rgba(74, 141, 218, 0.1)",
+          "description": "条件编译标识 ifdef "
+        },
+        "uniapp-complier-tools.highlightColorNotDo": {
+          "type": "string",
+          "default": "rgba(74, 141, 218, 0.1)",
+          "description": "条件编译标识 ifndef 的高亮颜色"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node build.js",
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.88.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript-eslint": "^8.54.0",
+    "eslint": "^9.39.2",
+    "typescript": "^5.9.3",
+    "ts-loader": "^9.5.4",
+    "webpack": "^5.104.1",
+    "webpack-cli": "^6.0.1",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}
