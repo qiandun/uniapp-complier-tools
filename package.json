@@ -6,6 +6,8 @@
   "engines": {
     "vscode": "^1.88.0"
   },
+  "publisher": "shudun",
+  "icon": "icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/qiandun/uniapp-complier-tools.git"
