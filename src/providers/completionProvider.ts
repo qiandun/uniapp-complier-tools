@@ -6,6 +6,7 @@ export const PLATFORM_CONSTANTS = [
   "VUE3", // uni-app js 引擎版用于区分 vue2 和 3，HBuilderX 3.2.0+
   "VUE2", // uni-app js 引擎版用于区分 vue2 和 3，
   "UNI-APP-X", // 用于区分是否是 uni-app x 项目 HBuilderX 3.9.0+
+  "uniVersion", // 用于区分编译器的版本	HBuilderX 3.9.0+
   "APP-PLUS-NVUE", // App nvue 页面，等同于 APP-NVUE
   "APP-PLUS", // uni-app js 引擎版编译为 App 时
   "APP-NVUE", // App nvue 页面，等同于 APP-PLUS-NVUE
@@ -56,18 +57,37 @@ export class UniAppCompletionItemProvider
     const lineContent = lineText.substring(0, position.character);
 
     // 检查是否在条件编译标签后面
-    const ifdefMatch = lineContent.match(
+    const ifdefMatchPlatform = lineContent.match(
       /^\s*(\/\/|\/\*|\<\!\-\-)(\s*#ifdef\s+|\s*#ifndef\s+)([A-Z0-9_:*\s|&!()-]*)$/,
     );
 
-    if (!ifdefMatch) {
-      if (lineContent.match(/^\s*(\/\/|\/\*|\<\!\-\-)\s*\s+$/)) {
-        return this._getPreprocessorCompletions();
+    if (!ifdefMatchPlatform) {
+      const ifdefMatch = lineContent.match(/^\s*(\/\/|\/\*|\<\!\-\-)(\s*)$/);
+      if (ifdefMatch) {
+        return this._getPreprocessorCompletions().map((item) => {
+          const startPos = position.translate(0, -ifdefMatch[2].length);
+          const replaceRange = new vscode.Range(startPos, position);
+          item.range = replaceRange;
+
+          return item;
+        });
       }
       return [];
     }
+    if (!/(\|\||&&|ifdef|ifndef)$/.test(ifdefMatchPlatform[0].trim())) {
+      return [];
+    }
+    const whitespaceEndLength = lineContent.match(/\s+$/)?.[0].length || 0;
     // 创建补全项
-    return this._getPlatformCompletions();
+    return this._getPlatformCompletions().map((item) => {
+      if (whitespaceEndLength) {
+        const startPos = position.translate(0, -whitespaceEndLength);
+        const replaceRange = new vscode.Range(startPos, position);
+        item.range = replaceRange;
+      }
+
+      return item;
+    });
   }
 
   private _getPlatformCompletions(): vscode.CompletionItem[] {
@@ -78,7 +98,7 @@ export class UniAppCompletionItemProvider
         platform,
         vscode.CompletionItemKind.Constant,
       );
-      item.insertText = platform;
+      item.insertText = ` ${platform}`;
       item.detail = `UniApp 平台: ${platform}`;
       item.documentation = this._getPlatformDescription(platform);
       completions.push(item);
@@ -93,6 +113,7 @@ export class UniAppCompletionItemProvider
       "VUE3-VAPOR": "uni-app Vue3 蒸汽模式",
       VUE2: "uni-app Vue2 版本",
       "UNI-APP-X": "uni-app x 项目",
+      uniVersion: "用于区分编译器的版本	HBuilderX 3.9.0+",
       APP: "App 平台",
       "APP-PLUS": "uni-app js 引擎版 App",
       "APP-ANDROID": "App Android 平台",
@@ -128,7 +149,7 @@ export class UniAppCompletionItemProvider
       "#ifdef",
       vscode.CompletionItemKind.Keyword,
     );
-    ifdefItem.insertText = "#ifdef";
+    ifdefItem.insertText = " #ifdef";
     ifdefItem.detail = "仅在指定平台存在";
     ifdefItem.documentation = "条件编译：仅在指定平台编译此代码块";
     completions.push(ifdefItem);
@@ -138,7 +159,7 @@ export class UniAppCompletionItemProvider
       "#ifndef",
       vscode.CompletionItemKind.Keyword,
     );
-    ifndefItem.insertText = "#ifndef";
+    ifndefItem.insertText = " #ifndef";
     ifndefItem.detail = "除了指定平台都存在";
     ifndefItem.documentation = "条件编译：除了指定平台，其他平台都编译此代码块";
     completions.push(ifndefItem);
@@ -148,7 +169,7 @@ export class UniAppCompletionItemProvider
       "#endif",
       vscode.CompletionItemKind.Keyword,
     );
-    endifItem.insertText = "#endif";
+    endifItem.insertText = " #endif";
     endifItem.detail = "条件编译结束";
     endifItem.documentation = "结束条件编译块";
     completions.push(endifItem);

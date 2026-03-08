@@ -3,7 +3,6 @@ import fs from "fs";
 import * as vscode from "vscode";
 import { UniAppCompletionItemProvider } from "./providers/completionProvider";
 import { ColorDecorator } from "./providers/decorator";
-import { console } from "inspector";
 
 // 定义支持的文档选择器，添加对uni-app相关文件类型的支持
 const baseSelector = [
@@ -35,7 +34,6 @@ export function activate(context: vscode.ExtensionContext) {
   if (!workspaceFolders || workspaceFolders.length === 0) {
     return;
   }
-  console.log("UniApp Extension action checking");
   let isUniappProject = false;
   for (const folder of workspaceFolders) {
     const packageJsonPath = path.join(folder.uri.fsPath, "manifest.json");
@@ -45,10 +43,8 @@ export function activate(context: vscode.ExtensionContext) {
     }
   }
   if (!isUniappProject) {
-    console.log("UniApp Extension action stop: no UniApp project");
     return;
   }
-  console.log("UniApp Extension action start");
   const completionProvider = new UniAppCompletionItemProvider();
   const provider = vscode.languages.registerCompletionItemProvider(
     combinedSelector,
@@ -89,4 +85,4 @@ export function activate(context: vscode.ExtensionContext) {
   );
 }
 
-export function deactivate() {}
+export function deactivate() { }
