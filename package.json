@@ -2,7 +2,7 @@
   "name": "uniapp-complier-tools",
   "displayName": "uniapp条件编译小工具",
   "description": "条件编译是用特殊的注释作为标记，在编译时根据这些特殊的注释，将注释里面的代码编译到不同平台",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "engines": {
     "vscode": "^1.88.0"
   },

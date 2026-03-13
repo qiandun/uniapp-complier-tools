@@ -201,126 +201,210 @@ export class ColorDecorator {
     ifndefDecorations: vscode.DecorationOptions[],
     endifDecorations: vscode.DecorationOptions[],
   ) {
-    // 查找script标签的位置
-    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
-    const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-    const templateRegex = /<template[^>]*>([\s\S]*?)<\/template>/gi;
+    // 查找script和style标签的位置，使用栈来处理嵌套
+    const tagPatterns = [
+      { open: /<script[^>]*>/gi, close: '</script>', type: 'script' as const },
+      { open: /<style[^>]*>/gi, close: '</style>', type: 'style' as const }
+    ];
 
-    let match;
     const processedRanges: Array<{
       start: number;
       end: number;
-      type: "script" | "style" | "template";
+      type: "script" | "style";
     }> = [];
 
-    // 找到所有script部分
-    while ((match = scriptRegex.exec(text))) {
-      processedRanges.push({
-        start: match.index,
-        end: match.index + match[0].length,
-        type: "script",
-      });
-    }
-
-    // 找到所有style部分
-    while ((match = styleRegex.exec(text))) {
-      processedRanges.push({
-        start: match.index,
-        end: match.index + match[0].length,
-        type: "style",
-      });
-    }
-
-    // 找到所有template部分
-    while ((match = templateRegex.exec(text))) {
-      processedRanges.push({
-        start: match.index,
-        end: match.index + match[0].length,
-        type: "template",
-      });
+    for (const pattern of tagPatterns) {
+      let match;
+      
+      // 找到所有开始标签
+      while ((match = pattern.open.exec(text))) {
+        const openTagEnd = match.index + match[0].length;
+        let depth = 1;
+        let searchPos = openTagEnd;
+        
+        // 使用栈来找到正确的闭合标签
+        while (depth > 0 && searchPos < text.length) {
+          const nextOpen = text.indexOf(`<${pattern.type}`, searchPos);
+          const nextClose = text.indexOf(pattern.close, searchPos);
+          
+          if (nextClose === -1) {
+            // 没有找到闭合标签，跳出
+            break;
+          }
+          
+          if (nextOpen !== -1 && nextOpen < nextClose) {
+            // 找到嵌套的开始标签
+            depth++;
+            searchPos = nextOpen + 1;
+          } else {
+            // 找到闭合标签
+            depth--;
+            if (depth === 0) {
+              processedRanges.push({
+                start: match.index,
+                end: nextClose + pattern.close.length,
+                type: pattern.type
+              });
+            }
+            searchPos = nextClose + 1;
+          }
+        }
+      }
     }
 
     // 按位置排序
     processedRanges.sort((a, b) => a.start - b.start);
 
-    // 处理每个部分
-    for (const range of processedRanges) {
-      const sectionText = text.substring(range.start, range.end);
-      const sectionType = range.type;
+    // 创建一个数组来标记哪些区域是script或style
+    const scriptStyleRanges = processedRanges.map(range => ({
+      start: range.start,
+      end: range.end,
+      type: range.type
+    }));
 
-      let regexes;
-      if (sectionType === "template") {
-        // 模板部分：同时支持HTML注释和块注释
-        const htmlRegexes = getCommentRegex(false, true);
-        const blockRegexes = getCommentRegex(true);
-        regexes = {
-          ifdef: new RegExp(
-            `(${htmlRegexes.ifdef.source}|${blockRegexes.ifdef.source})`,
-            "g",
-          ),
-          ifndef: new RegExp(
-            `(${htmlRegexes.ifndef.source}|${blockRegexes.ifndef.source})`,
-            "g",
-          ),
-          endif: new RegExp(
-            `(${htmlRegexes.endif.source}|${blockRegexes.endif.source})`,
-            "g",
-          ),
-        };
-      } else if (sectionType === "style") {
-        // 样式部分：使用块注释
-        regexes = getCommentRegex(true);
-      } else if (sectionType === "script") {
-        // 脚本部分：使用行注释
-        regexes = getCommentRegex(false);
-      } else {
-        // 默认使用行注释
-        regexes = getCommentRegex(false);
+    // 现在处理整个文件，区分不同区域
+    let currentIndex = 0;
+    
+    // 首先处理根级别的HTML注释（在第一个script/style之前）
+    if (scriptStyleRanges.length > 0) {
+      const firstRange = scriptStyleRanges[0];
+      if (firstRange.start > 0) {
+        this.processTextSection(
+          text.substring(0, firstRange.start),
+          editor,
+          0,
+          ifdefDecorations,
+          ifndefDecorations,
+          endifDecorations,
+          'html'
+        );
+        currentIndex = firstRange.start;
       }
+    } else {
+      // 没有script/style标签，整个文件都是HTML
+      this.processTextSection(
+        text,
+        editor,
+        0,
+        ifdefDecorations,
+        ifndefDecorations,
+        endifDecorations,
+        'html'
+      );
+      return;
+    }
 
-      // 在当前部分内搜索条件编译标签
-      let localMatch;
+    // 处理每个script/style区域及其之间的HTML区域
+    for (let i = 0; i < scriptStyleRanges.length; i++) {
+      const range = scriptStyleRanges[i];
+      
+      // 处理script/style区域
+      this.processTextSection(
+        text.substring(range.start, range.end),
+        editor,
+        range.start,
+        ifdefDecorations,
+        ifndefDecorations,
+        endifDecorations,
+        range.type
+      );
+      
+      // 处理当前区域和下一个区域之间的HTML区域
+      const nextRange = scriptStyleRanges[i + 1];
+      if (nextRange) {
+        if (range.end < nextRange.start) {
+          this.processTextSection(
+            text.substring(range.end, nextRange.start),
+            editor,
+            range.end,
+            ifdefDecorations,
+            ifndefDecorations,
+            endifDecorations,
+            'html'
+          );
+        }
+      } else {
+        // 处理最后一个区域之后的HTML区域
+        if (range.end < text.length) {
+          this.processTextSection(
+            text.substring(range.end),
+            editor,
+            range.end,
+            ifdefDecorations,
+            ifndefDecorations,
+            endifDecorations,
+            'html'
+          );
+        }
+      }
+    }
+  }
 
-      // 匹配 #ifdef
-      while ((localMatch = regexes.ifdef.exec(sectionText))) {
-        const globalStart = range.start + localMatch.index;
+  // 处理文本区域的辅助方法
+  private processTextSection(
+    sectionText: string,
+    editor: vscode.TextEditor,
+    globalOffset: number,
+    ifdefDecorations: vscode.DecorationOptions[],
+    ifndefDecorations: vscode.DecorationOptions[],
+    endifDecorations: vscode.DecorationOptions[],
+    sectionType: 'script' | 'style' | 'html'
+  ) {
+    let regexes;
+    
+    if (sectionType === "script") {
+      // 脚本部分：使用行注释
+      regexes = getCommentRegex(false);
+    } else if (sectionType === "style") {
+      // 样式部分：使用块注释
+      regexes = getCommentRegex(true);
+    } else {
+      // HTML部分：使用HTML注释
+      regexes = getCommentRegex(false, true);
+    }
+
+    // 在当前部分内搜索条件编译标签
+    let localMatch;
+
+    // 匹配 #ifdef
+    while ((localMatch = regexes.ifdef.exec(sectionText))) {
+      const globalStart = globalOffset + localMatch.index;
+      const globalEnd = globalStart + localMatch[0].length;
+      const startPos = editor.document.positionAt(globalStart);
+      const endPos = editor.document.positionAt(globalEnd);
+      ifdefDecorations.push({
+        range: new vscode.Range(startPos, endPos),
+        hoverMessage: "条件编译标签: 指定常量编译",
+      });
+    }
+
+    // 匹配 #ifndef
+    if (regexes.ifndef && regexes.ifndef instanceof RegExp) {
+      regexes.ifndef.lastIndex = 0; // 重置正则表达式索引
+      while ((localMatch = regexes.ifndef.exec(sectionText))) {
+        const globalStart = globalOffset + localMatch.index;
         const globalEnd = globalStart + localMatch[0].length;
         const startPos = editor.document.positionAt(globalStart);
         const endPos = editor.document.positionAt(globalEnd);
-        ifdefDecorations.push({
+        ifndefDecorations.push({
           range: new vscode.Range(startPos, endPos),
-          hoverMessage: "条件编译标签: 指定常量编译",
+          hoverMessage: "条件编译标签: 指定常量不编译",
         });
       }
+    }
 
-      // 匹配 #ifndef
-      if (regexes.ifndef && regexes.ifndef instanceof RegExp) {
-        regexes.ifndef.lastIndex = 0; // 重置正则表达式索引
-        while ((localMatch = regexes.ifndef.exec(sectionText))) {
-          const globalStart = range.start + localMatch.index;
-          const globalEnd = globalStart + localMatch[0].length;
-          const startPos = editor.document.positionAt(globalStart);
-          const endPos = editor.document.positionAt(globalEnd);
-          ifndefDecorations.push({
-            range: new vscode.Range(startPos, endPos),
-            hoverMessage: "条件编译标签: 指定常量不编译",
-          });
-        }
-      }
-
-      // 匹配 #endif
-      if (regexes.endif && regexes.endif instanceof RegExp) {
-        regexes.endif.lastIndex = 0; // 重置正则表达式索引
-        while ((localMatch = regexes.endif.exec(sectionText))) {
-          const globalStart = range.start + localMatch.index;
-          const globalEnd = globalStart + localMatch[0].length;
-          const startPos = editor.document.positionAt(globalStart);
-          const endPos = editor.document.positionAt(globalEnd);
-          endifDecorations.push({
-            range: new vscode.Range(startPos, endPos),
-            hoverMessage: "条件编译标签: 结束条件编译块",
-          });
-        }
+    // 匹配 #endif
+    if (regexes.endif && regexes.endif instanceof RegExp) {
+      regexes.endif.lastIndex = 0; // 重置正则表达式索引
+      while ((localMatch = regexes.endif.exec(sectionText))) {
+        const globalStart = globalOffset + localMatch.index;
+        const globalEnd = globalStart + localMatch[0].length;
+        const startPos = editor.document.positionAt(globalStart);
+        const endPos = editor.document.positionAt(globalEnd);
+        endifDecorations.push({
+          range: new vscode.Range(startPos, endPos),
+          hoverMessage: "条件编译标签: 结束条件编译块",
+        });
       }
     }
   }
