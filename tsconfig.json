@@ -8,6 +8,6 @@
 		"sourceMap": true,
 		"rootDir": "src",
 		"strict": true,
-		"types": ["node", "vscode"]
+		"types": ["node", "vscode", "mocha"]
 	}
 }
