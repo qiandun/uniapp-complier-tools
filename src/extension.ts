@@ -37,7 +37,10 @@ export function activate(context: vscode.ExtensionContext) {
   let isUniappProject = false;
   for (const folder of workspaceFolders) {
     const packageJsonPath = path.join(folder.uri.fsPath, "manifest.json");
-    const srcPackageJsonPath = path.join(folder.uri.fsPath, "src/manifest.json");
+    const srcPackageJsonPath = path.join(
+      folder.uri.fsPath,
+      "src/manifest.json",
+    );
     if (fs.existsSync(packageJsonPath) || fs.existsSync(srcPackageJsonPath)) {
       isUniappProject = true;
       break;
@@ -86,4 +89,4 @@ export function activate(context: vscode.ExtensionContext) {
   );
 }
 
-export function deactivate() { }
+export function deactivate() {}
