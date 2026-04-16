@@ -4,6 +4,8 @@
 
 > 项目识别，通过识别项目根目录 `/` 或者 `/src `是否存在文件 `manifest.json`
 >
+> 自动提取 `package.json` 自定义平台
+>
 > 注意：读取文件仅用只读的方式，只做识别，具体可以查看源码
 
 ![](https://origin.picgo.net/2026/03/06/example59633676d6d100d0.png)

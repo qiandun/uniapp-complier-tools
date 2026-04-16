@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { PLATFORM_CONSTANTS } from "./completionProvider";
+import { getConstantKeys } from "./completionProvider";
 
 const backgroundColorDo = vscode.workspace
   .getConfiguration()
@@ -9,7 +9,9 @@ const backgroundColorNotDo = vscode.workspace
   .getConfiguration()
   .get<string>("uniapp-complier-tools.highlightColorNotDo");
 
-const contentIconPath = vscode.Uri.parse('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKBAMAAAB/HNKOAAAAElBMVEUrmDoslzgrmTkAAAArmjkrmTnx5ZSuAAAABXRSTlOfQN8Av9ciMl0AAAAnSURBVAjXYwgFgiAwGcoQyhTqACQFQhmxksLGhkBSSUk1lEEVpAsAiV4Me28ejM4AAAAASUVORK5CYII=');
+const contentIconPath = vscode.Uri.parse(
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKBAMAAAB/HNKOAAAAElBMVEUrmDoslzgrmTkAAAArmjkrmTnx5ZSuAAAABXRSTlOfQN8Av9ciMl0AAAAnSURBVAjXYwgFgiAwGcoQyhTqACQFQhmxksLGhkBSSUk1lEEVpAsAiV4Me28ejM4AAAAASUVORK5CYII=",
+);
 
 const boforeIcon: vscode.ThemableDecorationAttachmentRenderOptions = {
   contentIconPath,
@@ -36,13 +38,13 @@ const endifDecorator = vscode.window.createTextEditorDecorationType({
   borderRadius: "3px",
 });
 
-const matchItem = PLATFORM_CONSTANTS.join("|");
-
 function generateStartRegex(
   refBefore: string,
   refAfter: string,
   target: "ifdef" | "ifndef" | "(ifdef|ifndef)" = "(ifdef|ifndef)",
 ) {
+  const matchItem = getConstantKeys().join("|");
+
   return new RegExp(
     [
       refBefore,
@@ -203,8 +205,8 @@ export class ColorDecorator {
   ) {
     // 查找script和style标签的位置，使用栈来处理嵌套
     const tagPatterns = [
-      { open: /<script[^>]*>/gi, close: '</script>', type: 'script' as const },
-      { open: /<style[^>]*>/gi, close: '</style>', type: 'style' as const }
+      { open: /<script[^>]*>/gi, close: "</script>", type: "script" as const },
+      { open: /<style[^>]*>/gi, close: "</style>", type: "style" as const },
     ];
 
     const processedRanges: Array<{
@@ -215,23 +217,23 @@ export class ColorDecorator {
 
     for (const pattern of tagPatterns) {
       let match;
-      
+
       // 找到所有开始标签
       while ((match = pattern.open.exec(text))) {
         const openTagEnd = match.index + match[0].length;
         let depth = 1;
         let searchPos = openTagEnd;
-        
+
         // 使用栈来找到正确的闭合标签
         while (depth > 0 && searchPos < text.length) {
           const nextOpen = text.indexOf(`<${pattern.type}`, searchPos);
           const nextClose = text.indexOf(pattern.close, searchPos);
-          
+
           if (nextClose === -1) {
             // 没有找到闭合标签，跳出
             break;
           }
-          
+
           if (nextOpen !== -1 && nextOpen < nextClose) {
             // 找到嵌套的开始标签
             depth++;
@@ -243,7 +245,7 @@ export class ColorDecorator {
               processedRanges.push({
                 start: match.index,
                 end: nextClose + pattern.close.length,
-                type: pattern.type
+                type: pattern.type,
               });
             }
             searchPos = nextClose + 1;
@@ -256,15 +258,15 @@ export class ColorDecorator {
     processedRanges.sort((a, b) => a.start - b.start);
 
     // 创建一个数组来标记哪些区域是script或style
-    const scriptStyleRanges = processedRanges.map(range => ({
+    const scriptStyleRanges = processedRanges.map((range) => ({
       start: range.start,
       end: range.end,
-      type: range.type
+      type: range.type,
     }));
 
     // 现在处理整个文件，区分不同区域
     let currentIndex = 0;
-    
+
     // 首先处理根级别的HTML注释（在第一个script/style之前）
     if (scriptStyleRanges.length > 0) {
       const firstRange = scriptStyleRanges[0];
@@ -276,7 +278,7 @@ export class ColorDecorator {
           ifdefDecorations,
           ifndefDecorations,
           endifDecorations,
-          'html'
+          "html",
         );
         currentIndex = firstRange.start;
       }
@@ -289,7 +291,7 @@ export class ColorDecorator {
         ifdefDecorations,
         ifndefDecorations,
         endifDecorations,
-        'html'
+        "html",
       );
       return;
     }
@@ -297,7 +299,7 @@ export class ColorDecorator {
     // 处理每个script/style区域及其之间的HTML区域
     for (let i = 0; i < scriptStyleRanges.length; i++) {
       const range = scriptStyleRanges[i];
-      
+
       // 处理script/style区域
       this.processTextSection(
         text.substring(range.start, range.end),
@@ -306,9 +308,9 @@ export class ColorDecorator {
         ifdefDecorations,
         ifndefDecorations,
         endifDecorations,
-        range.type
+        range.type,
       );
-      
+
       // 处理当前区域和下一个区域之间的HTML区域
       const nextRange = scriptStyleRanges[i + 1];
       if (nextRange) {
@@ -320,7 +322,7 @@ export class ColorDecorator {
             ifdefDecorations,
             ifndefDecorations,
             endifDecorations,
-            'html'
+            "html",
           );
         }
       } else {
@@ -333,7 +335,7 @@ export class ColorDecorator {
             ifdefDecorations,
             ifndefDecorations,
             endifDecorations,
-            'html'
+            "html",
           );
         }
       }
@@ -348,10 +350,10 @@ export class ColorDecorator {
     ifdefDecorations: vscode.DecorationOptions[],
     ifndefDecorations: vscode.DecorationOptions[],
     endifDecorations: vscode.DecorationOptions[],
-    sectionType: 'script' | 'style' | 'html'
+    sectionType: "script" | "style" | "html",
   ) {
     let regexes;
-    
+
     if (sectionType === "script") {
       // 脚本部分：使用行注释
       regexes = getCommentRegex(false);

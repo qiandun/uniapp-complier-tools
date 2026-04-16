@@ -49,7 +49,7 @@ export function activate(context: vscode.ExtensionContext) {
   if (!isUniappProject) {
     return;
   }
-  const completionProvider = new UniAppCompletionItemProvider();
+  const completionProvider = new UniAppCompletionItemProvider(context);
   const provider = vscode.languages.registerCompletionItemProvider(
     combinedSelector,
     completionProvider,
